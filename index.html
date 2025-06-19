@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCOTUS IRAC Workflow</title>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body {
+    font-family: Arial, sans-serif;
+    background: #23272f;
+    margin: 0;
+    padding: 0;
+}
+
+        .container {
+    max-width: 500px;
+    margin: 50px auto;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.30);
+    padding: 36px;
+    color: #23272f;
+}
+
+        h1 {
+    text-align: center;
+    color: #222;
+    font-size: 2.1em;
+    font-family: Arial, sans-serif;
+    font-weight: 900;
+    margin-bottom: 32px;
+}
+
+        label {
+    display: block;
+    margin-top: 24px;
+    font-family: 'Merriweather', 'Times New Roman', Times, serif;
+    font-size: 1.02em;
+    font-weight: 700;
+    color: #191919;
+    letter-spacing: 0.01em;
+    text-shadow: none;
+}
+
+        input[type="file"], select, input[type="text"] {
+    width: 100%;
+    margin-top: 8px;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    color: #23272f;
+    background: #fff;
+    text-shadow: none;
+}
+
+
+
+        button { margin-top: 24px; width: 100%; padding: 12px; border: none; border-radius: 4px; background: #3b82f6; color: #fff; font-size: 1.1em; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        button:hover { background: #2563eb; }
+    .custom-file-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.custom-file-label {
+    padding: 10px 16px;
+    border-radius: 4px;
+    border: 1.5px solid #ccc;
+    background: #f8f8f8;
+    font-family: 'Merriweather', 'Times New Roman', Times, serif;
+    font-size: 1em;
+    font-weight: 700;
+    color: #e74c3c;
+    transition: color 0.2s, border-color 0.2s;
+    cursor: pointer;
+    user-select: none;
+}
+.custom-file-label.has-file {
+    color: #27ae60;
+    border-color: #27ae60;
+}
+</style>
+</head>
+<body>
+    <div class="container">
+        <h1>SCOTUS IRAC Generator</h1>
+        <form id="iracForm">
+            <label for="role">I am a:</label>
+            <select id="role" name="role" required>
+                <option value="student">Law Student</option>
+                <option value="paralegal">Paralegal</option>
+            </select>
+
+            <label for="caseName">Case Name (optional):</label>
+            <input type="text" id="caseName" name="caseName" placeholder="e.g., Marbury v. Madison">
+            
+            <label for="docketNumber">Docket Number (optional):</label>
+            <input type="text" id="docketNumber" name="docketNumber" placeholder="e.g., 21-1234">
+
+            <label for="pdf">Upload Supreme Court Case PDF:</label>
+            <div class="custom-file-input-wrapper">
+                <input type="file" id="pdf" name="pdf" accept="application/pdf" required style="display:none;">
+                <label id="customFileLabel" for="pdf" class="custom-file-label">Select File</label>
+            </div>
+            <button type="submit">Generate IRAC Summary</button>
+        </form>
+        <div id="output" style="margin-top:32px;"></div>
+    </div>
+    <script>
+        const fileInput = document.getElementById('pdf');
+        const customFileLabel = document.getElementById('customFileLabel');
+        fileInput.addEventListener('change', function() {
+            if (!fileInput.value) {
+                customFileLabel.textContent = 'Select File';
+                customFileLabel.classList.remove('has-file');
+            } else {
+                const fileName = fileInput.files[0]?.name || 'File chosen';
+                customFileLabel.textContent = fileName;
+                customFileLabel.classList.add('has-file');
+            }
+        });
+        // Initialize state
+        customFileLabel.textContent = 'Select File';
+        customFileLabel.classList.remove('has-file');
+
+        document.getElementById('iracForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const output = document.getElementById('output');
+            if (!fileInput.files[0]) {
+                output.innerHTML = '<span style="color:#e74c3c">Please select a PDF file before submitting.</span>';
+                return;
+            }
+            output.innerHTML = '<em>Generating IRAC summary, please wait...</em>';
+            const formData = new FormData();
+            formData.append('role', document.getElementById('role').value);
+            formData.append('caseName', document.getElementById('caseName').value);
+            formData.append('docketNumber', document.getElementById('docketNumber').value);
+            formData.append('pdf', fileInput.files[0]);
+            try {
+                console.log('Sending request to /api/generate_irac');
+                console.log('Form data:', {
+                    role: document.getElementById('role').value,
+                    caseName: document.getElementById('caseName').value,
+                    docketNumber: document.getElementById('docketNumber').value,
+                    file: fileInput.files[0] ? fileInput.files[0].name : 'No file'
+                });
+
+                // Use relative URL since we're serving from the same origin
+                const apiUrl = '/api/generate_irac';
+                console.log('Sending request to:', apiUrl);
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Server error response:', errorText);
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        throw new Error(errorData.error || `Server error: ${response.status} ${response.statusText}`);
+                    } catch (e) {
+                        throw new Error(`Server error: ${response.status} ${response.statusText}. ${errorText}`);
+                    }
+                }
+                
+                const data = await response.json();
+                console.log('Received response:', data);
+                if (response.ok && data.summary) {
+                    // Convert markdown to HTML
+                    const markdown = data.summary
+                        .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+                        .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+                        .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                        .replace(/^\s*\n(\s*[-*+]\s+.*)/gm, function(match) {
+                            return match.split('\n').map(line => {
+                                if (line.trim().match(/^[-*+]\s+/)) {
+                                    return '<li>' + line.replace(/^[-*+]\s+/, '') + '</li>';
+                                }
+                                return line;
+                            }).join('\n');
+                        })
+                        .replace(/(\d+)\.\s+(.*?)(?=\n\d+\.|$)/gs, function(match, p1, p2) {
+                            return `<li>${p2}</li>`;
+                        })
+                        .replace(/\n/g, '<br>');
+                    
+                    output.innerHTML = `
+                        <div style="background:#f8f9fa; padding:20px; border-radius:8px; margin-top:20px;">
+                            <h2 style="color:#2c3e50; border-bottom:2px solid #eee; padding-bottom:10px;">IRAC Summary</h2>
+                            <div style="line-height:1.6; color:#333;">
+                                ${markdown}
+                            </div>
+                        </div>`;
+                } else {
+                    output.innerHTML = `<span style="color:#e74c3c">${data.error || 'An error occurred.'}</span>`;
+                }
+            } catch (err) {
+                console.error('Error details:', err);
+                console.error('Error stack:', err.stack);
+                let errorMessage = err.message || 'An unknown error occurred';
+                if (err instanceof TypeError) {
+                    errorMessage = 'Network error: Could not connect to the server. Please check your internet connection and try again.';
+                }
+                output.innerHTML = `
+                    <div style="color:#e74c3c; background:#fde8e8; padding:15px; border-radius:4px; margin-top:20px;">
+                        <strong>Error:</strong> ${errorMessage}
+                        <div style="margin-top:10px; font-size:0.9em; color:#666;">
+                            If this issue persists, please check the browser's developer console (F12) for more details.
+                        </div>
+                    </div>`;
+            }
+        });
+    </script>
+</body>
+</html>
