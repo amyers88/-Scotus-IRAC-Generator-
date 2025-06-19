@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: supreme-court-irac
+    env: python
+    plan: free
+    branch: main
+    buildCommand: ""
+    startCommand: gunicorn app:app
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
